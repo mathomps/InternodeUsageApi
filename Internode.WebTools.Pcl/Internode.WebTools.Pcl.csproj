@@ -46,6 +46,7 @@
     <Compile Include="InternodeCustomerApiClient.cs" />
     <Compile Include="InternodeService.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ServiceHistory.cs" />
     <Compile Include="ServiceInfo.cs" />
     <Compile Include="ServiceUsage.cs" />
   </ItemGroup>

@@ -35,7 +35,7 @@ namespace Internode.WebTools.Pcl
         public string Speed { get; set; }
     }
 
-    // A NodePhone service that belongs to a customer.
+    // A NodeMobile service that belongs to a customer.
     public class MobileServiceInfo : ServiceInfo
     {
         public string Sim { get; set; }

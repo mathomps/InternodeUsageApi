@@ -16,12 +16,9 @@ namespace Internode.WebTools.Pcl
 
         public InternodeCustomerApiClient()
         {
-            
-
             // Initialise properties
             Services = new List<InternodeService>();
             ServiceResources = new Dictionary<string, IEnumerable<InternodeServiceResource>>();
-
         }
 
         public void SetCredentials(string username, string password)
@@ -32,17 +29,29 @@ namespace Internode.WebTools.Pcl
             client = new HttpClient(handler) {
                 BaseAddress = new Uri("https://customer-webtools-api.internode.on.net/")
             };
+            client.DefaultRequestHeaders.Add("user-agent", "IntranetUsageMeter/0.01 (in development)");
+            
+        }
+
+        public Task<ServiceUsage> GetServiceUsageAsync(string serviceId)
+        {
+            throw new NotImplementedException();
+        }
+
+        public Task<ServiceHistory> GetServiceHistoryAsync(string serviceId)
+        {
+            throw new NotImplementedException();
         }
 
         public List<InternodeService> Services { get; private set; }
 
-        public Dictionary<string, IEnumerable<InternodeServiceResource>> ServiceResources { get; set; }
+        private Dictionary<string, IEnumerable<InternodeServiceResource>> ServiceResources { get; set; }
 
 
 
         // Public API
 
-        public async Task QueryForServices()
+        public async Task QueryForServicesAsync()
         {
             var xdoc = await ReadEndpoint("api/v1.5/");
 
@@ -57,7 +66,7 @@ namespace Internode.WebTools.Pcl
             }
         }
 
-        public async Task<AdslServiceInfo> GetAdslServiceInfo(string serviceId)
+        public async Task<AdslServiceInfo> GetAdslServiceInfoAsync(string serviceId)
         {
             var adslService = Services.Single(s => s.ServiceId == serviceId &&
                                                    s.ServiceType == ServiceType.PersonalAdsl);
@@ -101,6 +110,11 @@ namespace Internode.WebTools.Pcl
 
         }
 
+        public Task<MobileServiceInfo> GetMobileServiceInfoAsync(string serviceId)
+        {
+            throw new NotImplementedException();
+        }
+
         private async Task GetServiceResources(InternodeService service)
         {
             if (ServiceResources.ContainsKey(service.ServiceId)) return;        // Already got the data, don't query again.
@@ -121,18 +135,24 @@ namespace Internode.WebTools.Pcl
 
         private async Task<XDocument> ReadEndpoint(string endpointAddress)
         {
-            HttpResponseMessage response;
-            try
+            HttpResponseMessage response = null;
+            var retryCount = 3;
+
+            while (response == null && retryCount > 0)
             {
-                response = await GetResponseMessageAsync(endpointAddress);
+                try
+                {
+                    response = await GetResponseMessageAsync(endpointAddress);
+                }
+                catch (ServerErrorException)
+                {
+                    var re = new ManualResetEvent(initialState: false);
+                    re.WaitOne(2000);
+                    retryCount--;
+                }
             }
-            catch (ServerErrorException)
-            {
-                // Retry (once)
-                var re = new ManualResetEvent(initialState: true);
-                re.WaitOne(5000);
-                response = GetResponseMessageAsync(endpointAddress).Result;
-            }
+
+            if (response == null) return null;
 
             var resultStream = await response.Content.ReadAsStreamAsync();
             return XDocument.Load(resultStream);

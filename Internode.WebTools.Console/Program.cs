@@ -25,7 +25,7 @@ namespace Internode.WebTools.Console
                 // Perform a 'Wait' here, as we can't perform an 'await' from a Console application.
                 // Note that Wait() will always throw an AggregateException rather than a specific
                 // exception - we have to unwrap this exception to find out the actual error.
-                pcl.QueryForServices().Wait();
+                pcl.QueryForServicesAsync().Wait();
             }
             catch (AggregateException ex)
             {
@@ -55,12 +55,13 @@ namespace Internode.WebTools.Console
             var firstServiceId = pcl.Services.First().ServiceId;
             try
             {
-                var adslService = pcl.GetAdslServiceInfo(firstServiceId).Result;
+                var adslService = pcl.GetAdslServiceInfoAsync(firstServiceId).Result;
 
                 if (adslService != null)
                 {
-                    System.Console.WriteLine("ADSL:: Quota: {0}, Rollover: {1:d}, Speed: {2}",
-                                         adslService.Quota / 1000000, adslService.Rollover, adslService.Speed);
+                    System.Console.WriteLine("ADSL:\r\n Plan: {0}\r\n Quota: {1:N0}Gb\r\n Rollover: {2:d}\r\n Speed: {3}",
+                                             adslService.Plan, adslService.Quota / 100000000,
+                                             adslService.Rollover, adslService.Speed);
 
 
                     //var usage = pcl.GetServiceUsage(service.AdslService);
@@ -79,47 +80,6 @@ namespace Internode.WebTools.Console
 
             Con.WriteLine("\r\nAll done!");
             Con.ReadKey(false);
-            return;
-
-
-            var service = new CustomerApiService("username", "password");
-
-            try
-            {
-                service.QueryForServices();
-            }
-            catch (ServiceAuthenticationException)
-            {
-
-            }
-            catch (ServiceAccessException)
-            {
-                System.Console.WriteLine("** Internal Server Error **");
-            }
-
-
-            if (service.AdslService != null)
-            {
-                System.Console.WriteLine("Service endpoint: {0}, Service ID: {1}", service.AdslService.ServiceEndpoint, service.AdslService.ServiceId);
-            }
-
-
-            var serviceInfo = service.GetAdslPlan();
-
-            if (serviceInfo != null)
-            {
-                System.Console.WriteLine("ADSL:: Quota: {0}, Rollover: {1:d}, Speed: {2}",
-                                         serviceInfo.Quota / 1000000, serviceInfo.Rollover, serviceInfo.Speed);
-
-
-                var usage = service.GetServiceUsage(service.AdslService);
-                System.Console.WriteLine("Used: {0:n0}Mb, remaining: {1:n0}Mb, {2}% Remaining",
-                                         usage.MegabytesUsed, usage.MegabytesRemaining, usage.PercentRemaining);
-
-            }
-
-            System.Console.WriteLine("Press any key...");
-            System.Console.ReadKey(true);
 
         }
     }

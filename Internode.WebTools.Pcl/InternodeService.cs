@@ -1,13 +1,9 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Internode.WebTools.Pcl
 {
     /// <summary>
-    /// Represents an Internode Service that a customer has
+    /// Represents an Internode Service that belongs to a customer
     /// </summary>
     public class InternodeService
     {
@@ -25,6 +21,7 @@ namespace Internode.WebTools.Pcl
                 case "nodemobile":
                     ServiceType = ServiceType.NodeMobile;
                     break;
+
                 default:
                     throw new ArgumentException("Unsupported service type", "serviceType");
             }
