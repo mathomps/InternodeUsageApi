@@ -6,6 +6,10 @@ using System.Threading.Tasks;
 
 namespace Internode.WebTools.Pcl
 {
+
+    /// <summary>
+    /// Represents an individual service belonging to a customer.
+    /// </summary>
     public class ServiceInfo
     {
         public int Id { get; set; }
@@ -23,11 +27,15 @@ namespace Internode.WebTools.Pcl
         public string PlanCost { get; set; }
     }
 
+    /// <summary>
+    /// An ADSL service that belongs to a customer.
+    /// </summary>
     public class AdslServiceInfo : ServiceInfo
     {
         public string Speed { get; set; }
     }
 
+    // A NodePhone service that belongs to a customer.
     public class MobileServiceInfo : ServiceInfo
     {
         public string Sim { get; set; }

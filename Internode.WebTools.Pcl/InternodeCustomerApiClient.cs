@@ -1,21 +1,30 @@
-﻿using System;
+﻿using Internode.WebTools.Pcl.Exceptions;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Xml;
-using System.Xml.Linq;
-using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
-using Internode.WebTools.Pcl.Exceptions;
+using System.Xml.Linq;
 
 namespace Internode.WebTools.Pcl
 {
-    public class InternodeCustomerApiClient
+    public class InternodeCustomerApiClient : IInternodeCustomerApiClient
     {
-        private readonly HttpClient client;
+        private HttpClient client;
 
-        public InternodeCustomerApiClient(string username, string password)
+        public InternodeCustomerApiClient()
+        {
+            
+
+            // Initialise properties
+            Services = new List<InternodeService>();
+            ServiceResources = new Dictionary<string, IEnumerable<InternodeServiceResource>>();
+
+        }
+
+        public void SetCredentials(string username, string password)
         {
             var credentials = new NetworkCredential(username, password);
             var handler = new HttpClientHandler { Credentials = credentials };
@@ -23,32 +32,22 @@ namespace Internode.WebTools.Pcl
             client = new HttpClient(handler) {
                 BaseAddress = new Uri("https://customer-webtools-api.internode.on.net/")
             };
-
-            // Initialise properties
-            Services = new List<InternodeService>();
-            ServiceResources = new Dictionary<string, List<InternodeServiceResource>>();
-
         }
 
         public List<InternodeService> Services { get; private set; }
 
-        public Dictionary<string, List<InternodeServiceResource>> ServiceResources { get; set; }
+        public Dictionary<string, IEnumerable<InternodeServiceResource>> ServiceResources { get; set; }
 
 
 
         // Public API
 
-        public void QueryForServices()
+        public async Task QueryForServices()
         {
-            //var response = GetAsync("api/v1.5/").Result;
-
-            //OnResponseReceived(response);
-
-            var xdoc = ReadEndpoint("api/v1.5/"); //XDocument.Load(response.Content.ReadAsStreamAsync().Result);
+            var xdoc = await ReadEndpoint("api/v1.5/");
 
             var services = xdoc.Descendants("service").ToList();
 
-            // ToDo: Extract data from services
             foreach (var service in services)
             {
                 Services.Add(new InternodeService(
@@ -58,24 +57,24 @@ namespace Internode.WebTools.Pcl
             }
         }
 
-        public AdslServiceInfo GetAdslServiceInfo(string serviceId)
+        public async Task<AdslServiceInfo> GetAdslServiceInfo(string serviceId)
         {
-            var adslService = Services.Single(s => s.ServiceId == serviceId && s.ServiceType == ServiceType.PersonalAdsl);
+            var adslService = Services.Single(s => s.ServiceId == serviceId &&
+                                                   s.ServiceType == ServiceType.PersonalAdsl);
             if (adslService == null)
             {
                 throw new ServiceNotFoundException();
             }
 
-            GetServiceResources(adslService);
+            await GetServiceResources(adslService);
 
             var infoEndpoint = ServiceResources[serviceId].Single(sr => sr.Type == "service").Endpoint;
 
-            var xdoc = ReadEndpoint(infoEndpoint);
+            var xdoc = await ReadEndpoint(infoEndpoint);
 
             var serviceInfo = xdoc.Descendants("service").Single();
 
-            var result = new AdslServiceInfo
-            {
+            var result = new AdslServiceInfo {
                 Id = int.Parse(serviceInfo.Descendants("id").Single().Value),
                 Username = serviceInfo.Descendants("username").Single().Value,
                 Quota = long.Parse(serviceInfo.Descendants("quota").Single().Value),
@@ -84,7 +83,7 @@ namespace Internode.WebTools.Pcl
                 Speed = serviceInfo.Descendants("speed").Single().Value,
                 UsageRating = serviceInfo.Descendants("usage-rating").Single().Value,
                 Rollover = DateTime.Parse(serviceInfo.Descendants("rollover").Single().Value),
-                
+
                 ExcessCharged = serviceInfo.Descendants("excess-charged").Single().Value,
                 ExcessShaped = serviceInfo.Descendants("excess-shaped").Single().Value,
                 ExcessRestrictAccess = serviceInfo.Descendants("excess-restrict-access").Single().Value,
@@ -102,51 +101,54 @@ namespace Internode.WebTools.Pcl
 
         }
 
-        private void GetServiceResources(InternodeService service)
+        private async Task GetServiceResources(InternodeService service)
         {
             if (ServiceResources.ContainsKey(service.ServiceId)) return;        // Already got the data, don't query again.
 
-            var xdoc = ReadEndpoint(service.ServiceEndpoint);
+            var xdoc = await ReadEndpoint(service.ServiceEndpoint);
 
             var resources = xdoc.Descendants("resource");
 
-            var serviceResources = new List<InternodeServiceResource>();
-            foreach (var resource in resources)
-            {
-                serviceResources.Add(new InternodeServiceResource {
-                    Type = resource.Attribute("type").Value,
-                    Endpoint = resource.Attribute("href").Value
-                });
-            }
-            
+            var serviceResources = resources.Select(resource => new InternodeServiceResource {
+                Type = resource.Attribute("type").Value,
+                Endpoint = resource.Attribute("href").Value
+            });
+
             ServiceResources.Add(service.ServiceId, serviceResources);
         }
 
 
 
-        private XDocument ReadEndpoint(string endpointAddress)
+        private async Task<XDocument> ReadEndpoint(string endpointAddress)
         {
             HttpResponseMessage response;
             try
             {
-                response = GetAsync(endpointAddress).Result;
-                OnResponseReceived(response);
+                response = await GetResponseMessageAsync(endpointAddress);
             }
             catch (ServerErrorException)
             {
                 // Retry (once)
-                response = GetAsync(endpointAddress).Result;
-                OnResponseReceived(response);
+                var re = new ManualResetEvent(initialState: true);
+                re.WaitOne(5000);
+                response = GetResponseMessageAsync(endpointAddress).Result;
             }
 
-            return XDocument.Load(response.Content.ReadAsStreamAsync().Result);
+            var resultStream = await response.Content.ReadAsStreamAsync();
+            return XDocument.Load(resultStream);
         }
 
-        private Task<HttpResponseMessage> GetAsync(string uri)
+        private async Task<HttpResponseMessage> GetResponseMessageAsync(string uri)
         {
-            return client.GetAsync(uri);
+            var response = await client.GetAsync(uri);
+            OnResponseReceived(response);
+            return response;
         }
 
+        /// <summary>
+        /// Automatically throw exceptions if the response is not valid for any reason.
+        /// </summary>
+        /// <param name="response"></param>
         private void OnResponseReceived(HttpResponseMessage response)
         {
             switch (response.StatusCode)
@@ -164,7 +166,7 @@ namespace Internode.WebTools.Pcl
             {
                 throw new Exception(response.StatusCode.ToString());
             }
-            
+
         }
 
     }
