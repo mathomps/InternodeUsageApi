@@ -17,7 +17,6 @@ namespace Internode.WebTools.Pcl
         public InternodeCustomerApiClient()
         {
             // Initialise properties
-            Services = new List<InternodeService>();
             ServiceResources = new Dictionary<string, IEnumerable<InternodeServiceResource>>();
         }
 
@@ -43,7 +42,7 @@ namespace Internode.WebTools.Pcl
             throw new NotImplementedException();
         }
 
-        public List<InternodeService> Services { get; private set; }
+        private List<InternodeService> Services { get; set; }
 
         private Dictionary<string, IEnumerable<InternodeServiceResource>> ServiceResources { get; set; }
 
@@ -51,25 +50,22 @@ namespace Internode.WebTools.Pcl
 
         // Public API
 
-        public async Task QueryForServicesAsync()
+        public async Task<List<InternodeService>> QueryForServicesAsync()
         {
             var xdoc = await ReadEndpoint("api/v1.5/");
 
             var services = xdoc.Descendants("service").ToList();
 
-            foreach (var service in services)
-            {
-                Services.Add(new InternodeService(
-                    service.Attribute("type").Value,
-                    service.Value,
-                    service.Attribute("href").Value));
-            }
+            Services = services.Select(GetServiceFromServiceElement)
+                               .ToList();
+            return Services;
         }
+
 
         public async Task<AdslServiceInfo> GetAdslServiceInfoAsync(string serviceId)
         {
-            var adslService = Services.Single(s => s.ServiceId == serviceId &&
-                                                   s.ServiceType == ServiceType.PersonalAdsl);
+            var adslService = Services.SingleOrDefault(s => s.ServiceId == serviceId &&
+                                                            s.ServiceType == ServiceType.PersonalAdsl);
             if (adslService == null)
             {
                 throw new ServiceNotFoundException();
@@ -131,7 +127,7 @@ namespace Internode.WebTools.Pcl
             ServiceResources.Add(service.ServiceId, serviceResources);
         }
 
-
+        // Internal Helpers
 
         private async Task<XDocument> ReadEndpoint(string endpointAddress)
         {
@@ -188,6 +184,18 @@ namespace Internode.WebTools.Pcl
             }
 
         }
+
+
+
+        public InternodeService GetServiceFromServiceElement(XElement serviceElement)
+        {
+            return new InternodeService(
+                serviceType: serviceElement.Attribute("type").Value,
+                serviceId: serviceElement.Value,
+                serviceEndpoint: serviceElement.Attribute("href").Value
+                );
+        }
+
 
     }
 

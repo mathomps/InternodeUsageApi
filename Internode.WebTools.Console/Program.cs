@@ -1,7 +1,6 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using Internode.WebTools.Domain.Exceptions;
-using Internode.WebTools.Domain.Services;
 using Internode.WebTools.Pcl;
 using Internode.WebTools.Pcl.Exceptions;
 using Con = System.Console;
@@ -10,6 +9,9 @@ namespace Internode.WebTools.Console
 {
     class Program
     {
+
+        private static List<InternodeService> services; 
+
         static void Main(string[] args)
         {
             Con.Write("Username: ");
@@ -17,19 +19,19 @@ namespace Internode.WebTools.Console
             Con.Write("Password: ");
             var password = System.Console.ReadLine();
 
-            var pcl = new InternodeCustomerApiClient();
+            IInternodeCustomerApiClient pcl = new InternodeCustomerApiClient();
             pcl.SetCredentials(username, password);
 
             try
             {
-                // Perform a 'Wait' here, as we can't perform an 'await' from a Console application.
-                // Note that Wait() will always throw an AggregateException rather than a specific
+                // Perform a '.Result' here, as we can't perform an 'await' from a Console application.
+                // Note that Result will always throw an AggregateException rather than a specific
                 // exception - we have to unwrap this exception to find out the actual error.
-                pcl.QueryForServicesAsync().Wait();
+                services = pcl.QueryForServicesAsync().Result;
             }
             catch (AggregateException ex)
             {
-                if (ex.InnerExceptions[0].InnerException is AuthenticationException)
+                if (ex.InnerExceptions[0] is AuthenticationException)
                 {
                     Con.WriteLine("** Authentication failure **");
                     Con.ReadKey(false);
@@ -39,20 +41,20 @@ namespace Internode.WebTools.Console
             }
 
             Con.WriteLine("Services for this account:");
-            foreach (var internodeService in pcl.Services)
+            foreach (var internodeService in services)
             {
                 Con.WriteLine("Type: {0}, ServiceId: {1}", internodeService.ServiceType, internodeService.ServiceId);
             }
 
 
-            if (!pcl.Services.Any())
+            if (!services.Any())
             {
                 Con.WriteLine("No services to enumerate!");
                 Con.ReadKey(false);
                 return;
             }
 
-            var firstServiceId = pcl.Services.First().ServiceId;
+            var firstServiceId = services.First().ServiceId;
             try
             {
                 var adslService = pcl.GetAdslServiceInfoAsync(firstServiceId).Result;
@@ -60,7 +62,7 @@ namespace Internode.WebTools.Console
                 if (adslService != null)
                 {
                     System.Console.WriteLine("ADSL:\r\n Plan: {0}\r\n Quota: {1:N0}Gb\r\n Rollover: {2:d}\r\n Speed: {3}",
-                                             adslService.Plan, adslService.Quota / 100000000,
+                                             adslService.Plan, adslService.Quota / 1000000000,
                                              adslService.Rollover, adslService.Speed);
 
 

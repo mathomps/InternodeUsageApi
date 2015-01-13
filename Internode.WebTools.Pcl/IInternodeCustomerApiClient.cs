@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -16,7 +17,7 @@ namespace Internode.WebTools.Pcl
         /// Performs an initial query for all services that a customer has.
         /// </summary>
         /// <returns></returns>
-        Task QueryForServicesAsync();
+        Task<List<InternodeService>>  QueryForServicesAsync();
 
         /// <summary>
         /// Retrieves ADSL service information for the specified ServiceId
@@ -45,10 +46,6 @@ namespace Internode.WebTools.Pcl
         /// <param name="serviceId"></param>
         /// <returns></returns>
         Task<ServiceHistory> GetServiceHistoryAsync(string serviceId);
-
-        /// <summary>
-        /// A list of services that is populated after calling QueryForServicesAsync()
-        /// </summary>
-        List<InternodeService> Services { get; }
+       
     }
 }
